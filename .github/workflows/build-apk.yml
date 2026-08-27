@@ -1,0 +1,40 @@
+name: Build Osmantus Halayi APK
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'osmantus-halayi/**'
+      - '.github/workflows/build-apk.yml'
+  workflow_dispatch:
+
+jobs:
+  build-android:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Unpack Osmantus Halayi project
+        run: |
+          mkdir -p osmantus-halayi/build-src
+          base64 -d osmantus-halayi/project.tar.gz.b64 > /tmp/osmantus-halayi.tar.gz
+          tar -xzf /tmp/osmantus-halayi.tar.gz -C osmantus-halayi/build-src
+          ls -la osmantus-halayi/build-src
+
+      - name: Build APK with Buildozer
+        uses: ArtemSBulgakov/buildozer-action@v1
+        id: buildozer
+        with:
+          workdir: osmantus-halayi/build-src
+          command: buildozer android debug
+          buildozer_version: stable
+
+      - name: Upload Osmantus Halayi APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Osmantus-Halayi-APK
+          path: osmantus-halayi/build-src/bin/*.apk
+          if-no-files-found: error
