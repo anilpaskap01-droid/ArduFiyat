@@ -1,6 +1,5 @@
 name: Build Osmantus Halayi APK
 
-# trigger: 2026-08-27
 on:
   push:
     branches: [ main ]
@@ -20,18 +19,24 @@ jobs:
 
       - name: Unpack Osmantus Halayi project
         run: |
+          rm -rf osmantus-halayi/build-src
           mkdir -p osmantus-halayi/build-src
           base64 -d osmantus-halayi/project.tar.gz.b64 > /tmp/osmantus-halayi.tar.gz
           tar -xzf /tmp/osmantus-halayi.tar.gz -C osmantus-halayi/build-src
-          ls -la osmantus-halayi/build-src
+          echo "Project files:"
+          find osmantus-halayi/build-src -maxdepth 2 -type f -print
 
-      - name: Build APK with Buildozer
-        uses: ArtemSBulgakov/buildozer-action@v1
-        id: buildozer
-        with:
-          workdir: osmantus-halayi/build-src
-          command: buildozer android debug
-          buildozer_version: stable
+      - name: Build APK with official Kivy Buildozer image
+        run: |
+          mkdir -p "$HOME/.buildozer"
+          docker pull ghcr.io/kivy/buildozer:latest
+          docker run --rm \
+            -e PYTHONFORANDROID_PREREQUISITES_INSTALL_INTERACTIVE=0 \
+            -v "$HOME/.buildozer:/home/user/.buildozer" \
+            -v "$GITHUB_WORKSPACE/osmantus-halayi/build-src:/home/user/hostcwd" \
+            ghcr.io/kivy/buildozer:latest android debug
+          echo "APK output:"
+          find osmantus-halayi/build-src/bin -maxdepth 1 -type f -print || true
 
       - name: Upload Osmantus Halayi APK
         uses: actions/upload-artifact@v4
