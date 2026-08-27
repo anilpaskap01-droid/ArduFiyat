@@ -4,7 +4,8 @@ on:
   push:
     branches: [ main ]
     paths:
-      - 'osmantus-halayi/**'
+      - 'osmantus-halayi/main.py'
+      - 'osmantus-halayi/buildozer.spec'
       - '.github/workflows/build-apk.yml'
   workflow_dispatch:
 
@@ -17,14 +18,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Unpack Osmantus Halayi project
+      - name: Validate project
         run: |
-          rm -rf osmantus-halayi/build-src
-          mkdir -p osmantus-halayi/build-src
-          base64 -d osmantus-halayi/project.tar.gz.b64 > /tmp/osmantus-halayi.tar.gz
-          tar -xzf /tmp/osmantus-halayi.tar.gz -C osmantus-halayi/build-src
-          echo "Project files:"
-          find osmantus-halayi/build-src -maxdepth 2 -type f -print
+          python -m py_compile osmantus-halayi/main.py
+          test -f osmantus-halayi/buildozer.spec
+          echo "Source validated"
 
       - name: Build APK with official Kivy Buildozer image
         run: |
@@ -33,14 +31,14 @@ jobs:
           docker run --rm \
             -e PYTHONFORANDROID_PREREQUISITES_INSTALL_INTERACTIVE=0 \
             -v "$HOME/.buildozer:/home/user/.buildozer" \
-            -v "$GITHUB_WORKSPACE/osmantus-halayi/build-src:/home/user/hostcwd" \
+            -v "$GITHUB_WORKSPACE/osmantus-halayi:/home/user/hostcwd" \
             ghcr.io/kivy/buildozer:latest android debug
           echo "APK output:"
-          find osmantus-halayi/build-src/bin -maxdepth 1 -type f -print || true
+          find osmantus-halayi/bin -maxdepth 1 -type f -print
 
       - name: Upload Osmantus Halayi APK
         uses: actions/upload-artifact@v4
         with:
           name: Osmantus-Halayi-APK
-          path: osmantus-halayi/build-src/bin/*.apk
+          path: osmantus-halayi/bin/*.apk
           if-no-files-found: error
