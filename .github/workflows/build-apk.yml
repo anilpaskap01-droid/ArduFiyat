@@ -1,45 +1,68 @@
 name: Build Osmantus Halayi APK
 
 on:
-  push:
-    branches: [ main ]
-    paths:
-      - 'osmantus-halayi/**'
-      - '.github/workflows/build-apk.yml'
   workflow_dispatch:
 
 jobs:
   build-android:
     name: Build Android APK
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     timeout-minutes: 60
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Validate project
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install system dependencies
         run: |
-          python -m py_compile osmantus-halayi/main.py
-          test -f osmantus-halayi/buildozer.spec
+          sudo apt-get update
+          sudo apt-get install -y git zip unzip python3-pip autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev cmake libffi-dev libssl-dev automake
+
+      - name: Install Buildozer
+        run: |
+          python3 -m pip install --upgrade pip setuptools wheel
+          python3 -m pip install "cython<3" buildozer
+          buildozer --version
+
+      - name: Validate project
+        working-directory: osmantus-halayi
+        run: |
+          python3 -m py_compile main.py
+          test -f buildozer.spec
           echo "Source validated"
 
-      - name: Build APK with official Kivy Buildozer image
+      - name: Build APK
+        working-directory: osmantus-halayi
+        env:
+          PYTHONFORANDROID_PREREQUISITES_INSTALL_INTERACTIVE: 0
         run: |
-          mkdir -p "$HOME/.buildozer"
-          docker pull ghcr.io/kivy/buildozer:latest
-          docker run --rm \
-            -e PYTHONFORANDROID_PREREQUISITES_INSTALL_INTERACTIVE=0 \
-            -v "$HOME/.buildozer:/home/user/.buildozer" \
-            -v "$GITHUB_WORKSPACE/osmantus-halayi:/home/user/hostcwd" \
-            ghcr.io/kivy/buildozer:latest android debug
-          echo "APK output:"
-          find osmantus-halayi/bin -maxdepth 1 -type f -print
+          yes | buildozer -v android debug 2>&1 | tee build.log
+
+      - name: Find APK
+        if: always()
+        run: |
+          find osmantus-halayi -type f -name '*.apk' -print || true
 
       - name: Upload Osmantus Halayi APK
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: Osmantus-Halayi-APK
           path: osmantus-halayi/bin/*.apk
           if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Osmantus-Halayi-Build-Log
+          path: osmantus-halayi/build.log
+          if-no-files-found: ignore
           retention-days: 7
