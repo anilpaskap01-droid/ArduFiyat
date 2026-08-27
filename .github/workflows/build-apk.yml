@@ -1,5 +1,6 @@
 name: Build Osmantus Halayi APK
 
+# trigger: 2026-08-27
 on:
   push:
     branches: [ main ]
